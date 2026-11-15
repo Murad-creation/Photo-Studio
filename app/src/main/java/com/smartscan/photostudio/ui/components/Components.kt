@@ -37,7 +37,7 @@ fun SmartScanBottomNavigation(items: List<BottomItem>, currentRoute: String?, on
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SmartScanTopBar(title: String, onBack: (() -> Unit)? = null) {
+fun SmartScanTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
     TopAppBar(
         title = { Text(title, style = MaterialTheme.typography.titleLarge) },
         navigationIcon = {
@@ -45,6 +45,7 @@ fun SmartScanTopBar(title: String, onBack: (() -> Unit)? = null) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
         },
+        actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
     )
 }
@@ -91,4 +92,16 @@ fun EmptyStateView(icon: ImageVector, title: String, message: String, modifier: 
         Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
+}
+
+@Composable
+fun ConfirmationDialog(title: String, text: String, confirmLabel: String, onConfirm: () -> Unit, onDismiss: () -> Unit, dismissLabel: String = "Cancel") {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = DialogShape,
+        title = { Text(title) },
+        text = { Text(text) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(dismissLabel) } },
+    )
 }

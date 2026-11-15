@@ -33,12 +33,13 @@ import com.smartscan.photostudio.ui.components.PrimaryActionButton
 import com.smartscan.photostudio.ui.components.SecondaryActionButton
 import com.smartscan.photostudio.ui.components.SmartScanTopBar
 import com.smartscan.photostudio.ui.theme.*
+import java.io.File
 import java.util.Locale
 
 private val stepTitles = listOf("Front side", "Back side", "Enhance", "A4 preview", "Export")
 
 @Composable
-fun NidScreen(onExit: () -> Unit) {
+fun NidScreen(onExit: () -> Unit, onSendToPc: (List<File>) -> Unit) {
     val activity = LocalContext.current as ComponentActivity
     val vm: NidViewModel = viewModel(viewModelStoreOwner = activity) // keeps progress while navigating away
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -67,7 +68,7 @@ fun NidScreen(onExit: () -> Unit) {
                 NidStep.BACK -> CaptureStep(Side.BACK, ui, vm)
                 NidStep.ENHANCE -> EnhanceStep(ui, vm)
                 NidStep.PREVIEW -> PreviewStep(ui, vm)
-                NidStep.EXPORT -> ExportStep(ui, vm)
+                NidStep.EXPORT -> ExportStep(ui, vm, onSendToPc)
             }
             if (ui.busy) {
                 Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
@@ -205,7 +206,7 @@ private fun EnhanceStep(ui: NidUiState, vm: NidViewModel) {
 }
 
 @Composable
-private fun LabeledSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+internal fun LabeledSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
     Column {
         Row { Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium); Text("${value.toInt()}", style = MaterialTheme.typography.labelMedium) }
         Slider(value, onChange, valueRange = range)
@@ -251,7 +252,7 @@ private fun PreviewStep(ui: NidUiState, vm: NidViewModel) {
 }
 
 @Composable
-private fun ExportStep(ui: NidUiState, vm: NidViewModel) {
+private fun ExportStep(ui: NidUiState, vm: NidViewModel, onSendToPc: (List<File>) -> Unit) {
     val ctx = LocalContext.current
     val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(ui.format.mime)) { uri ->
         if (uri != null) vm.saveTo(uri)
@@ -289,10 +290,7 @@ private fun ExportStep(ui: NidUiState, vm: NidViewModel) {
                         }
                         ctx.startActivity(Intent.createChooser(send, "Share"))
                     }, Modifier.fillMaxWidth())
-                    OutlinedButton({}, enabled = false, shape = ButtonShape, modifier = Modifier.fillMaxWidth().heightIn(min = Spacing.buttonHeight)) {
-                        Text("Send to PC")
-                    }
-                    Text("Send to PC arrives with the Wi-Fi transfer phase.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    SecondaryActionButton("Send to PC", { onSendToPc(listOf(ex.file)) }, Modifier.fillMaxWidth())
                 }
             }
             SecondaryActionButton("Start a new scan", { vm.startOver() }, Modifier.fillMaxWidth())

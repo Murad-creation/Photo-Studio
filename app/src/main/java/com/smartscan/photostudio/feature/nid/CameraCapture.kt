@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,6 +53,9 @@ fun CameraCapture(
     onGallery: () -> Unit,
     onError: (String) -> Unit,
     modifier: Modifier = Modifier,
+    frameAspect: Float = 1.586f,
+    hint: String = "Place the card inside the frame",
+    allowFlip: Boolean = false,
 ) {
     val ctx = LocalContext.current
     var granted by remember {
@@ -85,7 +89,7 @@ fun CameraCapture(
         }
         return
     }
-    LiveCamera(onCaptured, onGallery, onError, modifier)
+    LiveCamera(onCaptured, onGallery, onError, modifier, frameAspect, hint, allowFlip)
 }
 
 @Composable
@@ -94,6 +98,9 @@ private fun LiveCamera(
     onGallery: () -> Unit,
     onError: (String) -> Unit,
     modifier: Modifier,
+    frameAspect: Float,
+    hint: String,
+    allowFlip: Boolean,
 ) {
     val ctx = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -102,16 +109,17 @@ private fun LiveCamera(
     var camera by remember { mutableStateOf<Camera?>(null) }
     var torch by remember { mutableStateOf(false) }
     var taking by remember { mutableStateOf(false) }
+    var front by remember { mutableStateOf(false) }
     val hasFlash = camera?.cameraInfo?.hasFlashUnit() == true
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, front) {
         val future = ProcessCameraProvider.getInstance(ctx)
         future.addListener({
             try {
                 val provider = future.get()
                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
                 provider.unbindAll()
-                camera = provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                camera = provider.bindToLifecycle(lifecycleOwner, (if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA), preview, imageCapture)
             } catch (e: Exception) {
                 onError("Could not start the camera: ${e.message}")
             }
@@ -128,14 +136,14 @@ private fun LiveCamera(
             AndroidView({ previewView }, Modifier.fillMaxSize())
             Canvas(Modifier.fillMaxSize()) {
                 val w = size.width * 0.86f
-                val h = w / 1.586f
+                val h = w / frameAspect
                 drawRoundRect(
                     Color.White, Offset((size.width - w) / 2f, (size.height - h) / 2f), Size(w, h),
                     CornerRadius(12.dp.toPx()), style = Stroke(3.dp.toPx()),
                 )
             }
             Text(
-                "Place the card inside the frame",
+                hint,
                 color = Color.White, style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.align(Alignment.TopCenter).padding(Spacing.x3),
             )
@@ -161,6 +169,9 @@ private fun LiveCamera(
                         )
                     },
             )
+            if (allowFlip) IconButton(onClick = { front = !front }, modifier = Modifier.size(Spacing.minTouchTarget)) {
+                Icon(Icons.Filled.FlipCameraAndroid, contentDescription = "Switch camera")
+            }
             IconButton(onClick = { torch = !torch }, enabled = hasFlash, modifier = Modifier.size(Spacing.minTouchTarget)) {
                 Icon(if (torch) Icons.Filled.FlashOn else Icons.Filled.FlashOff, contentDescription = "Toggle flash")
             }

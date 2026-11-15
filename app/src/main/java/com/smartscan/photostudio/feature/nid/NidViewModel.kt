@@ -14,7 +14,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import com.smartscan.photostudio.data.SettingsRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -58,6 +60,13 @@ class NidViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(NidUiState())
     val ui: StateFlow<NidUiState> = _ui.asStateFlow()
     private var previewJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            val st = SettingsRepository(app).settings.first()
+            _ui.update { it.copy(format = st.format, quality = st.quality, dpi = st.dpi) }
+        }
+    }
 
     private fun work(block: suspend () -> Unit) = viewModelScope.launch {
         _ui.update { it.copy(busy = true, status = null) }

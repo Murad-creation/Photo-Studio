@@ -9,7 +9,7 @@ android {
     defaultConfig {
         applicationId = "com.smartscan.photostudio"
         minSdk = 26; targetSdk = 34
-        versionCode = 2; versionName = "0.2.0"
+        versionCode = 9; versionName = "0.9.0"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
     buildTypes { release { isMinifyEnabled = false } }
@@ -38,4 +38,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
     implementation("org.opencv:opencv:4.9.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    implementation("com.google.mlkit:face-detection:16.1.6")
+    implementation("com.google.zxing:core:3.5.3")
 }

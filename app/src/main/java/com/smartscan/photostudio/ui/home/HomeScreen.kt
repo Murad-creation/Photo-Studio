@@ -13,14 +13,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.smartscan.photostudio.core.LibraryFile
+import com.smartscan.photostudio.core.LibraryFiles
 import com.smartscan.photostudio.navigation.Routes
 import com.smartscan.photostudio.ui.components.*
 import com.smartscan.photostudio.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
-fun HomeScreen(onNavigate: (String) -> Unit, onOpenSettings: () -> Unit) {
+fun HomeScreen(onNavigate: (String) -> Unit, onOpenSettings: () -> Unit, onOpenFile: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val files by produceState(emptyList<LibraryFile>()) {
+        value = withContext(Dispatchers.IO) { LibraryFiles.list(ctx) }
+    }
+    val scans = files.filter { it.folder == "nid" || it.folder == "docs" }.take(3)
+    val projects = files.filter { it.folder == "passport" }.take(3)
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = Spacing.screenHorizontal, vertical = Spacing.x4),
@@ -41,10 +53,12 @@ fun HomeScreen(onNavigate: (String) -> Unit, onOpenSettings: () -> Unit) {
         }
 
         Section("Recent Projects") {
-            EmptyStateView(Icons.Filled.FolderOpen, "No projects yet", "Projects you create will appear here.")
+            if (projects.isEmpty()) EmptyStateView(Icons.Filled.FolderOpen, "No projects yet", "Passport photos you save will appear here.")
+            else projects.forEach { f -> RecentProjectCard(f, { onOpenFile(f.rel) }, Modifier.fillMaxWidth()) }
         }
         Section("Recently Scanned") {
-            EmptyStateView(Icons.Filled.History, "Nothing scanned yet", "Your latest scans will show up here.")
+            if (scans.isEmpty()) EmptyStateView(Icons.Filled.History, "Nothing scanned yet", "Your latest scans will show up here.")
+            else scans.forEach { f -> RecentProjectCard(f, { onOpenFile(f.rel) }, Modifier.fillMaxWidth()) }
         }
         Section("Quick Actions") {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x3)) {

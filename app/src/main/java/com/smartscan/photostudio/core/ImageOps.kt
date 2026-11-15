@@ -26,7 +26,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-enum class EnhanceFilter { ORIGINAL, AUTO, MAGIC }
+enum class EnhanceFilter { ORIGINAL, AUTO, MAGIC, GRAYSCALE, BLACK_WHITE }
 
 data class EnhanceParams(
     val filter: EnhanceFilter = EnhanceFilter.MAGIC,
@@ -93,6 +93,11 @@ object ImageOps {
     fun defaultCorners(b: Bitmap): List<PointF> {
         val dx = b.width * 0.08f; val dy = b.height * 0.08f
         return listOf(PointF(dx, dy), PointF(b.width - dx, dy), PointF(b.width - dx, b.height - dy), PointF(dx, b.height - dy))
+    }
+
+    fun fullCorners(b: Bitmap): List<PointF> {
+        val w = b.width.toFloat(); val h = b.height.toFloat()
+        return listOf(PointF(0f, 0f), PointF(w, 0f), PointF(w, h), PointF(0f, h))
     }
 
     /** Returns corners ordered TL, TR, BR, BL in bitmap coordinates, or null if no card-like quadrilateral was found. */
@@ -168,6 +173,8 @@ object ImageOps {
             EnhanceFilter.ORIGINAL -> rgb.clone()
             EnhanceFilter.AUTO -> autoLevels(rgb)
             EnhanceFilter.MAGIC -> magic(rgb)
+            EnhanceFilter.GRAYSCALE -> grayLevels(rgb)
+            EnhanceFilter.BLACK_WHITE -> rgb.clone()
         }
         rgb.release()
         if (p.brightness != 0f || p.contrast != 0f) {
@@ -182,11 +189,26 @@ object ImageOps {
             Core.addWeighted(work, 1.0 + amt, blur, -amt, 0.0, work)
             blur.release()
         }
+        if (p.filter == EnhanceFilter.BLACK_WHITE) {
+            val g = Mat(); Imgproc.cvtColor(work, g, Imgproc.COLOR_RGB2GRAY)
+            val bw = Mat()
+            Imgproc.adaptiveThreshold(g, bw, 255.0, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY, 31, 15.0)
+            g.release(); work.release()
+            work = Mat(); Imgproc.cvtColor(bw, work, Imgproc.COLOR_GRAY2RGB); bw.release()
+        }
         val outRgba = Mat(); Imgproc.cvtColor(work, outRgba, Imgproc.COLOR_RGB2RGBA)
         val bmp = Bitmap.createBitmap(outRgba.cols(), outRgba.rows(), Bitmap.Config.ARGB_8888)
         Utils.matToBitmap(outRgba, bmp)
         work.release(); outRgba.release()
         return bmp
+    }
+
+    private fun grayLevels(rgb: Mat): Mat {
+        val g = Mat(); Imgproc.cvtColor(rgb, g, Imgproc.COLOR_RGB2GRAY)
+        val (lo, hi) = percentileBounds(g, 0.01, 0.99)
+        val s = stretch(g, lo, hi); g.release()
+        val out = Mat(); Imgproc.cvtColor(s, out, Imgproc.COLOR_GRAY2RGB); s.release()
+        return out
     }
 
     private fun percentileBounds(gray: Mat, lowPct: Double, highPct: Double): Pair<Double, Double> {
