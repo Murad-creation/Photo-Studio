@@ -9,13 +9,14 @@ Scan. Edit. Save. Share.
 | 0.2.0 | NID Scanner: CameraX capture, gallery import, OpenCV card detection + draggable corners, perspective correction, Original / Auto / Magic Color, A4 layout with 0.5 in gap, PDF / JPG / PNG export |
 | 0.3.0 | Document Scanner: multi-page capture, filters (Original, Magic Color, Grayscale, Black & White), reorder / delete / retake, paper sizes + orientation, PDF preview, PDF / JPG / PNG export |
 | 0.9.0 | Passport Photo Studio (ML Kit face detection + selfie segmentation, background colors, size presets, print sheets), Send to PC (temporary local Wi-Fi server, QR code), My Files (search, sort, filter, grid/list, rename, delete, share, favorites, details, preview), full Settings, Home recent items. Release candidate: all screens are wired, not yet verified on a device |
+| 0.9.1 | NID: camera shots are cropped automatically to the on-screen frame, with a check-and-adjust step before saving. Passport: one-tap "Save single photo as image" (JPG/PNG). Send to PC: permanent address and automatic delivery to an open PC page |
 
 The version is shown in Settings > About (from `versionName` in `app/build.gradle.kts`).
 
 ## Known limits
 - Edge detection runs after capture (no live tracking or auto shutter). You can drag the four corners.
 - Background removal uses ML Kit selfie segmentation; hair edges can be imperfect. Face identity is never altered, only background, framing and light.
-- Send to PC works only while the app stays open and both devices are on the same network. The session stops on timeout, on download completion or with the Stop button.
+- Send to PC: the phone runs a receiver with a permanent address (fixed port + secret link). Open the address on the PC once, keep the page open, and every file you send downloads there by itself. It runs as a foreground service (notification) so it keeps working in the background. It uses plain HTTP on your local network; anyone on the same Wi-Fi who knows the secret link can fetch files that are in the outbox. Use "Reset address" if the link leaks, and avoid public Wi-Fi. The address contains the phone's IP, which can change when the router reassigns it (reserve an IP for the phone in the router to keep it fixed). Android may stop background services on some phones with aggressive battery saving.
 - Scan progress is kept while the app is alive, not after Android kills the process.
 - Saved files live in the app's private library; use "Save to device" or Share to copy them out.
 

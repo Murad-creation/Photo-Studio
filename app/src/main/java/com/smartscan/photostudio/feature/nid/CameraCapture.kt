@@ -47,13 +47,17 @@ import com.smartscan.photostudio.ui.theme.ComponentStyles
 import com.smartscan.photostudio.ui.theme.Spacing
 import java.io.File
 
+/** The on-screen frame: card is cropped to exactly this area after capture. */
+const val FRAME_WIDTH_FRACTION = 0.86f
+const val CARD_ASPECT = 1.586f
+
 @Composable
 fun CameraCapture(
     onCaptured: (File) -> Unit,
     onGallery: () -> Unit,
     onError: (String) -> Unit,
     modifier: Modifier = Modifier,
-    frameAspect: Float = 1.586f,
+    frameAspect: Float = CARD_ASPECT,
     hint: String = "Place the card inside the frame",
     allowFlip: Boolean = false,
 ) {
@@ -135,7 +139,7 @@ private fun LiveCamera(
         ) {
             AndroidView({ previewView }, Modifier.fillMaxSize())
             Canvas(Modifier.fillMaxSize()) {
-                val w = size.width * 0.86f
+                val w = size.width * FRAME_WIDTH_FRACTION
                 val h = w / frameAspect
                 drawRoundRect(
                     Color.White, Offset((size.width - w) / 2f, (size.height - h) / 2f), Size(w, h),

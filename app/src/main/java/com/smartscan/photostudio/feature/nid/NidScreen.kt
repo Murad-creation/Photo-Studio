@@ -63,7 +63,8 @@ fun NidScreen(onExit: () -> Unit, onSendToPc: (List<File>) -> Unit) {
         }
         Spacer(Modifier.height(Spacing.x3))
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (ui.step) {
+            val pendingCrop = ui.pending
+            if (pendingCrop != null) CropStep(pendingCrop, vm) else when (ui.step) {
                 NidStep.FRONT -> CaptureStep(Side.FRONT, ui, vm)
                 NidStep.BACK -> CaptureStep(Side.BACK, ui, vm)
                 NidStep.ENHANCE -> EnhanceStep(ui, vm)
@@ -196,8 +197,11 @@ private fun EnhanceStep(ui: NidUiState, vm: NidViewModel) {
             OutlinedButton({ vm.rotate(side) }, shape = ButtonShape, modifier = Modifier.weight(1f).heightIn(min = Spacing.minTouchTarget)) {
                 Icon(Icons.Filled.RotateRight, null); Text("  Rotate")
             }
+            OutlinedButton({ vm.recrop(side) }, shape = ButtonShape, modifier = Modifier.weight(1f).heightIn(min = Spacing.minTouchTarget)) {
+                Text("Adjust crop")
+            }
             OutlinedButton({ vm.retake(side) }, shape = ButtonShape, modifier = Modifier.weight(1f).heightIn(min = Spacing.minTouchTarget)) {
-                Text("Re-crop / retake")
+                Text("Retake")
             }
         }
         PrimaryActionButton("Next: A4 preview", { vm.goTo(NidStep.PREVIEW) }, Modifier.fillMaxWidth())
@@ -257,6 +261,7 @@ private fun ExportStep(ui: NidUiState, vm: NidViewModel, onSendToPc: (List<File>
     val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(ui.format.mime)) { uri ->
         if (uri != null) vm.saveTo(uri)
     }
+    var confirmSave by remember { mutableStateOf(false) }
     val ex = ui.exported
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Spacing.screenHorizontal), verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
@@ -273,7 +278,7 @@ private fun ExportStep(ui: NidUiState, vm: NidViewModel, onSendToPc: (List<File>
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
             listOf(150, 300).forEach { d -> FilterChip(ui.dpi == d, { vm.setDpi(d) }, { Text("$d DPI") }) }
         }
-        PrimaryActionButton(if (ex == null) "Create file" else "Create again", { vm.createFile() }, Modifier.fillMaxWidth())
+        PrimaryActionButton(if (ex == null) "Create file" else "Create again", { confirmSave = true }, Modifier.fillMaxWidth())
 
         if (ex != null) {
             Card(shape = CardShape, colors = ComponentStyles.cardColors(), modifier = Modifier.fillMaxWidth()) {
@@ -295,6 +300,43 @@ private fun ExportStep(ui: NidUiState, vm: NidViewModel, onSendToPc: (List<File>
             }
             SecondaryActionButton("Start a new scan", { vm.startOver() }, Modifier.fillMaxWidth())
         }
+        if (confirmSave) {
+            AlertDialog(
+                onDismissRequest = { confirmSave = false },
+                shape = DialogShape,
+                title = { Text("Check the cards before saving") },
+                text = {
+                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                        ui.previewFront?.let { Image(it.asImageBitmap(), "Front side", Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Fit) }
+                        ui.previewBack?.let { Image(it.asImageBitmap(), "Back side", Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Fit) }
+                        Text("Is each card cropped correctly? You can adjust the crop now.", style = MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                            OutlinedButton({ confirmSave = false; vm.recrop(Side.FRONT) }, Modifier.weight(1f)) { Text("Adjust front") }
+                            OutlinedButton({ confirmSave = false; vm.recrop(Side.BACK) }, Modifier.weight(1f)) { Text("Adjust back") }
+                        }
+                    }
+                },
+                confirmButton = { TextButton({ confirmSave = false; vm.createFile() }) { Text("Save") } },
+                dismissButton = { TextButton({ confirmSave = false }) { Text("Cancel") } },
+            )
+        }
         Spacer(Modifier.height(Spacing.x4))
+    }
+}
+
+
+@Composable
+private fun CropStep(pending: PendingCrop, vm: NidViewModel) {
+    Column(Modifier.fillMaxSize().padding(horizontal = Spacing.screenHorizontal), verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
+        Text(
+            if (pending.autoDetected) "Drag the corners to adjust the crop."
+            else "Edges could not be detected automatically. Drag each corner onto the card's corner.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        CropEditor(pending.source, pending.corners, vm::updateCorners, Modifier.weight(1f).fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x3)) {
+            SecondaryActionButton("Cancel", { vm.cancelPending() }, Modifier.weight(1f))
+            PrimaryActionButton("Apply crop", { vm.confirmCrop() }, Modifier.weight(1f))
+        }
     }
 }

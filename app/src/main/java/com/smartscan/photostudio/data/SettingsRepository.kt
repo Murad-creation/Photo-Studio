@@ -36,6 +36,9 @@ data class AppSettings(
     val quality: ExportQuality = ExportQuality.HIGH,
     val dpi: Int = 300,
     val sessionMin: Int = 5,
+    val receiverOn: Boolean = false,
+    val idleStopHours: Int = 0,
+    val transferPort: Int = 8765,
     val favorites: Set<String> = emptySet(),
 )
 
@@ -51,6 +54,10 @@ private object K {
     val dpi = intPreferencesKey("default_dpi")
     val session = intPreferencesKey("session_min")
     val favorites = stringSetPreferencesKey("favorites")
+    val token = stringPreferencesKey("transfer_token")
+    val port = intPreferencesKey("transfer_port")
+    val receiverOn = booleanPreferencesKey("receiver_on")
+    val idleStop = intPreferencesKey("receiver_idle_hours")
 }
 
 private inline fun <reified E : Enum<E>> Preferences.enumOf(k: Preferences.Key<String>, def: E): E {
@@ -71,6 +78,9 @@ class SettingsRepository(private val context: Context) {
             quality = p.enumOf(K.quality, ExportQuality.HIGH),
             dpi = p[K.dpi] ?: 300,
             sessionMin = p[K.session] ?: 5,
+            receiverOn = p[K.receiverOn] ?: false,
+            idleStopHours = p[K.idleStop] ?: 0,
+            transferPort = p[K.port] ?: 8765,
             favorites = p[K.favorites] ?: emptySet(),
         )
     }
@@ -87,6 +97,20 @@ class SettingsRepository(private val context: Context) {
     suspend fun setQuality(v: ExportQuality) = set(K.quality, v.name)
     suspend fun setDpi(v: Int) = set(K.dpi, v)
     suspend fun setSessionMin(v: Int) = set(K.session, v)
+
+    suspend fun setReceiverOn(v: Boolean) = set(K.receiverOn, v)
+    suspend fun setIdleStopHours(v: Int) = set(K.idleStop, v)
+
+    /** The permanent secret in the receiver address. Created once, kept until the user resets it. */
+    suspend fun ensureTransferToken(): String {
+        var out = ""
+        context.store.edit { p ->
+            val t = p[K.token]
+            if (t != null && t.length >= 16) out = t else { out = newToken(); p[K.token] = out }
+        }
+        return out
+    }
+    suspend fun resetTransferToken() { context.store.edit { it[K.token] = newToken() } }
 
     suspend fun toggleFavorite(path: String) {
         context.store.edit { p ->
@@ -107,3 +131,6 @@ class SettingsRepository(private val context: Context) {
         }
     }
 }
+
+private fun newToken(): String =
+    ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }

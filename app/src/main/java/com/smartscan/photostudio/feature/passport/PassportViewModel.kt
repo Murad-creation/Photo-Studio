@@ -238,6 +238,13 @@ class PassportViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** One photo only (no print sheet), written as an image file. */
+    fun saveSingle(format: ExportFormat) {
+        val f = if (format == ExportFormat.PNG) ExportFormat.PNG else ExportFormat.JPG
+        _ui.update { it.copy(target = ExportTarget.PHOTO, format = f, exported = null, step = PassportStep.EXPORT) }
+        createFile()
+    }
+
     fun saveTo(uri: Uri) {
         val f = _ui.value.exported ?: return
         work {

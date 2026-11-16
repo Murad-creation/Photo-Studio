@@ -95,6 +95,15 @@ object ImageOps {
         return listOf(PointF(dx, dy), PointF(b.width - dx, dy), PointF(b.width - dx, b.height - dy), PointF(dx, b.height - dy))
     }
 
+    /** Axis-aligned rectangle that matches the on-screen camera frame (centered, [widthFraction] of the width). */
+    fun frameCorners(b: Bitmap, widthFraction: Float, aspect: Float): List<PointF> {
+        var w = b.width * widthFraction
+        var h = w / aspect
+        if (h > b.height * 0.98f) { h = b.height * 0.98f; w = h * aspect }
+        val cx = b.width / 2f; val cy = b.height / 2f
+        return listOf(PointF(cx - w / 2, cy - h / 2), PointF(cx + w / 2, cy - h / 2), PointF(cx + w / 2, cy + h / 2), PointF(cx - w / 2, cy + h / 2))
+    }
+
     fun fullCorners(b: Bitmap): List<PointF> {
         val w = b.width.toFloat(); val h = b.height.toFloat()
         return listOf(PointF(0f, 0f), PointF(w, 0f), PointF(w, h), PointF(0f, h))

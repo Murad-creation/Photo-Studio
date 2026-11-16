@@ -132,6 +132,7 @@ private fun EditStep(ui: PassportUiState, vm: PassportViewModel) {
             SecondaryActionButton("Reset position", { vm.resetFraming() }, Modifier.weight(1f))
             SecondaryActionButton("New photo", { vm.newPhoto() }, Modifier.weight(1f))
         }
+        SaveSingleButton(ui, vm)
         PrimaryActionButton("Next: Print layout", { vm.goTo(PassportStep.LAYOUT) }, Modifier.fillMaxWidth())
         Spacer(Modifier.height(Spacing.x4))
     }
@@ -218,5 +219,32 @@ private fun ExportStep(ui: PassportUiState, vm: PassportViewModel, onSendToPc: (
             }
         }
         Spacer(Modifier.height(Spacing.x4))
+    }
+}
+
+
+@Composable
+private fun SaveSingleButton(ui: PassportUiState, vm: PassportViewModel) {
+    var open by remember { mutableStateOf(false) }
+    var fmt by remember { mutableStateOf(ExportFormat.JPG) }
+    SecondaryActionButton("Save single photo as image", { open = true }, Modifier.fillMaxWidth())
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            shape = DialogShape,
+            title = { Text("Save single photo") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
+                    OutlinedTextField(ui.fileName, { vm.setFileName(it) }, label = { Text("File name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.x2)) {
+                        FilterChip(fmt == ExportFormat.JPG, { fmt = ExportFormat.JPG }, { Text("JPG") })
+                        FilterChip(fmt == ExportFormat.PNG, { fmt = ExportFormat.PNG }, { Text("PNG") })
+                    }
+                    Text("Saves one photo at the chosen size, without a print sheet.", style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = { TextButton({ open = false; vm.saveSingle(fmt) }) { Text("Save") } },
+            dismissButton = { TextButton({ open = false }) { Text("Cancel") } },
+        )
     }
 }

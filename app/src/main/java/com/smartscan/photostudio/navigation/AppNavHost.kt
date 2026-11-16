@@ -14,7 +14,10 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
-import com.smartscan.photostudio.core.transfer.TransferQueue
+import androidx.compose.ui.platform.LocalContext
+import com.smartscan.photostudio.core.transfer.TransferManager
+import com.smartscan.photostudio.data.SettingsRepository
+import kotlinx.coroutines.flow.first
 import com.smartscan.photostudio.feature.doc.DocScreen
 import com.smartscan.photostudio.feature.nid.NidScreen
 import com.smartscan.photostudio.feature.passport.PassportScreen
@@ -57,8 +60,13 @@ fun AppNavHost(themeMode: ThemeMode, onThemeChange: (ThemeMode) -> Unit) {
         popUpTo(nav.graph.findStartDestination().id) { saveState = true }
         launchSingleTop = true; restoreState = true
     }
+    val appCtx = LocalContext.current.applicationContext
+    // The receiver keeps its permanent address: if it was on last time, bring it back when the app opens.
+    LaunchedEffect(Unit) {
+        if (SettingsRepository(appCtx).settings.first().receiverOn) TransferManager.start(appCtx)
+    }
     val sendToPc: (List<File>) -> Unit = { files ->
-        TransferQueue.set(files)
+        TransferManager.send(appCtx, files)
         nav.navigate(Routes.PC) { launchSingleTop = true }
     }
     val openFile: (String) -> Unit = { rel -> nav.navigate(Routes.preview(rel)) { launchSingleTop = true } }

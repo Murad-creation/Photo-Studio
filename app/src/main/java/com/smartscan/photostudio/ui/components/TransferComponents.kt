@@ -21,7 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.smartscan.photostudio.core.transfer.TransferUiState
 import com.smartscan.photostudio.ui.theme.*
-import java.util.Locale
 
 @Composable
 private fun StatusRow(icon: ImageVector, label: String, value: String, ok: Boolean?) {
@@ -40,10 +39,14 @@ fun TransferStatusCard(s: TransferUiState, modifier: Modifier = Modifier) {
         Column(Modifier.padding(Spacing.x4), verticalArrangement = Arrangement.spacedBy(Spacing.x1)) {
             StatusRow(if (s.lan.connected) Icons.Filled.Wifi else Icons.Filled.WifiOff, "Wi-Fi",
                 if (s.lan.connected) "Connected · ${s.lan.ip}" else "Not connected", s.lan.connected)
-            StatusRow(Icons.Filled.Dns, "Transfer server",
-                if (s.running) String.format(Locale.US, "Running · session ends in %d:%02d", s.secondsLeft / 60, s.secondsLeft % 60) else "Stopped", if (s.running) true else null)
-            StatusRow(Icons.Filled.Computer, "Connected device",
-                s.clientAgent?.let { "$it · ${s.clientIp}" } ?: if (s.running) "Waiting for a device to open the link…" else "None", if (s.clientAgent != null) true else null)
+            StatusRow(Icons.Filled.Dns, "PC receiver",
+                when { s.starting -> "Starting…"; s.running -> "On · permanent address"; else -> "Off" }, if (s.running) true else null)
+            StatusRow(Icons.Filled.Computer, "PC",
+                when {
+                    s.pcOnline -> "${s.pcAgent ?: "Browser"} · ${s.pcIp}"
+                    s.running -> "Waiting for the PC to open the address…"
+                    else -> "—"
+                }, if (s.pcOnline) true else null)
         }
     }
 }
@@ -52,7 +55,7 @@ fun TransferStatusCard(s: TransferUiState, modifier: Modifier = Modifier) {
 fun QRCodeCard(qr: Bitmap?, url: String, onCopy: () -> Unit, modifier: Modifier = Modifier) {
     Card(shape = CardShape, colors = ComponentStyles.cardColors(), modifier = modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.x4), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.x3)) {
-            Text("Open this address on your PC", style = MaterialTheme.typography.titleMedium)
+            Text("Your PC address (permanent)", style = MaterialTheme.typography.titleMedium)
             qr?.let {
                 Image(it.asImageBitmap(), "QR code for the pairing link", Modifier.size(220.dp).background(Color.White).padding(8.dp))
             }

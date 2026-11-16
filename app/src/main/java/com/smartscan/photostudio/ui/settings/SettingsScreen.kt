@@ -113,10 +113,10 @@ fun SettingsScreen(mode: ThemeMode, onChange: (ThemeMode) -> Unit) {
             }
 
             SettingsCard("Transfer") {
-                Label("Session timeout")
-                ChipRow(listOf(5, 10, 30).map { it to "$it min" }, s.sessionMin) { run { repo.setSessionMin(it) } }
+                Label("Stop the PC receiver automatically when idle")
+                ChipRow(listOf(0 to "Never", 1 to "1 hour", 4 to "4 hours", 12 to "12 hours"), s.idleStopHours) { run { repo.setIdleStopHours(it) } }
                 Text(
-                    "Send to PC starts a temporary server on your Wi-Fi. It needs a secret link, and stops when the session ends.",
+                    "The receiver has a permanent address (see Send to PC). It serves only files you send, and only to someone who has the secret link.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

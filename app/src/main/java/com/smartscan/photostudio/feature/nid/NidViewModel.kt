@@ -28,7 +28,7 @@ import java.util.Locale
 enum class NidStep { FRONT, BACK, ENHANCE, PREVIEW, EXPORT }
 enum class Side { FRONT, BACK }
 
-data class PendingCrop(val side: Side, val source: Bitmap, val corners: List<PointF>, val autoDetected: Boolean)
+data class PendingCrop(val side: Side, val source: Bitmap, val corners: List<PointF>, val autoDetected: Boolean, val returnTo: NidStep? = null)
 data class ExportedFile(val file: File, val format: ExportFormat, val sizeBytes: Long)
 data class StatusMsg(val text: String, val isError: Boolean)
 
@@ -38,6 +38,12 @@ data class NidUiState(
     val back: Bitmap? = null,
     val frontSmall: Bitmap? = null,
     val backSmall: Bitmap? = null,
+    val frontSrc: Bitmap? = null,
+    val backSrc: Bitmap? = null,
+    val frontCorners: List<PointF>? = null,
+    val backCorners: List<PointF>? = null,
+    val frontRot: Int = 0,
+    val backRot: Int = 0,
     val previewFront: Bitmap? = null,
     val previewBack: Bitmap? = null,
     val a4Preview: Bitmap? = null,
@@ -84,20 +90,43 @@ class NidViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ----- capture / import -----
-    fun onSourceUri(side: Side, uri: Uri, deleteAfter: File? = null) {
+    /** Gallery import: use the detected card edges when found, otherwise ask for a manual crop. */
+    fun onSourceUri(side: Side, uri: Uri) {
         work {
             val ctx = getApplication<Application>()
             val bmp = withContext(Dispatchers.IO) { ImageOps.loadBitmap(ctx, uri) }
                 ?: throw IOException("Could not open this image.")
-            deleteAfter?.delete()
             val found = withContext(Dispatchers.Default) { ImageOps.detectCard(bmp) }
-            _ui.update {
-                it.copy(pending = PendingCrop(side, bmp, found ?: ImageOps.defaultCorners(bmp), found != null))
-            }
+            if (found != null) applyCrop(side, bmp, found, null)
+            else _ui.update { it.copy(pending = PendingCrop(side, bmp, ImageOps.defaultCorners(bmp), false)) }
         }
     }
 
-    fun onPhoto(side: Side, file: File) = onSourceUri(side, Uri.fromFile(file), deleteAfter = file)
+    /** Camera: crop automatically to the on-screen frame. The crop can be adjusted before saving. */
+    fun onPhoto(side: Side, file: File) {
+        work {
+            val ctx = getApplication<Application>()
+            val bmp = withContext(Dispatchers.IO) { ImageOps.loadBitmap(ctx, Uri.fromFile(file)) }
+                ?: throw IOException("Could not read the captured photo.")
+            file.delete()
+            applyCrop(side, bmp, ImageOps.frameCorners(bmp, FRAME_WIDTH_FRACTION, CARD_ASPECT), null)
+        }
+    }
+
+    private suspend fun applyCrop(side: Side, source: Bitmap, corners: List<PointF>, returnTo: NidStep?) {
+        val rot = if (side == Side.FRONT) _ui.value.frontRot else _ui.value.backRot
+        val cropped = withContext(Dispatchers.Default) {
+            val c = ImageOps.warp(source, corners)
+            if (rot != 0) ImageOps.rotate(c, rot) else c
+        }
+        val small = withContext(Dispatchers.Default) { ImageOps.downscale(cropped, 1000) }
+        _ui.update { s ->
+            val ns = if (side == Side.FRONT) s.copy(front = cropped, frontSmall = small, frontSrc = source, frontCorners = corners)
+            else s.copy(back = cropped, backSmall = small, backSrc = source, backCorners = corners)
+            ns.copy(pending = null, exported = null, step = returnTo ?: nextStep(ns))
+        }
+        refreshPreviews()
+    }
 
     fun updateCorners(c: List<PointF>) {
         _ui.update { s -> s.pending?.let { s.copy(pending = it.copy(corners = c)) } ?: s }
@@ -107,16 +136,15 @@ class NidViewModel(app: Application) : AndroidViewModel(app) {
 
     fun confirmCrop() {
         val p = _ui.value.pending ?: return
-        work {
-            val cropped = withContext(Dispatchers.Default) { ImageOps.warp(p.source, p.corners) }
-            val small = withContext(Dispatchers.Default) { ImageOps.downscale(cropped, 1000) }
-            _ui.update { s ->
-                val ns = if (p.side == Side.FRONT) s.copy(front = cropped, frontSmall = small)
-                else s.copy(back = cropped, backSmall = small)
-                ns.copy(pending = null, exported = null, step = nextStep(ns))
-            }
-            refreshPreviews()
-        }
+        work { applyCrop(p.side, p.source, p.corners, p.returnTo) }
+    }
+
+    /** Re-open the crop editor for a side that was already captured. */
+    fun recrop(side: Side) {
+        val s = _ui.value
+        val src = (if (side == Side.FRONT) s.frontSrc else s.backSrc) ?: return
+        val corners = (if (side == Side.FRONT) s.frontCorners else s.backCorners) ?: ImageOps.defaultCorners(src)
+        _ui.update { it.copy(pending = PendingCrop(side, src, corners, true, returnTo = it.step)) }
     }
 
     private fun nextStep(s: NidUiState) = when {
@@ -127,8 +155,8 @@ class NidViewModel(app: Application) : AndroidViewModel(app) {
 
     fun retake(side: Side) {
         _ui.update {
-            val n = if (side == Side.FRONT) it.copy(front = null, frontSmall = null, previewFront = null)
-            else it.copy(back = null, backSmall = null, previewBack = null)
+            val n = if (side == Side.FRONT) it.copy(front = null, frontSmall = null, previewFront = null, frontSrc = null, frontCorners = null, frontRot = 0)
+            else it.copy(back = null, backSmall = null, previewBack = null, backSrc = null, backCorners = null, backRot = 0)
             n.copy(a4Preview = null, exported = null, step = if (side == Side.FRONT) NidStep.FRONT else NidStep.BACK)
         }
     }
@@ -153,7 +181,7 @@ class NidViewModel(app: Application) : AndroidViewModel(app) {
             val r = withContext(Dispatchers.Default) { ImageOps.rotate(src, 90) }
             val sm = withContext(Dispatchers.Default) { ImageOps.downscale(r, 1000) }
             _ui.update {
-                (if (side == Side.FRONT) it.copy(front = r, frontSmall = sm) else it.copy(back = r, backSmall = sm))
+                (if (side == Side.FRONT) it.copy(front = r, frontSmall = sm, frontRot = (it.frontRot + 90) % 360) else it.copy(back = r, backSmall = sm, backRot = (it.backRot + 90) % 360))
                     .copy(exported = null)
             }
             refreshPreviews()
